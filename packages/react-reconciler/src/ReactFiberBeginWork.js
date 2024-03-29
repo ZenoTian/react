@@ -326,6 +326,13 @@ if (__DEV__) {
   didWarnAboutDefaultPropsOnFunctionComponent = ({}: {[string]: boolean});
 }
 
+/**
+ * @description reconcile核心方法
+ * @param {*} current
+ * @param {*} workInProgress
+ * @param {*} nextChildren
+ * @param {*} renderLanes 优先级
+ */
 export function reconcileChildren(
   current: Fiber | null,
   workInProgress: Fiber,
@@ -333,10 +340,13 @@ export function reconcileChildren(
   renderLanes: Lanes,
 ) {
   if (current === null) {
+    // mount的逻辑
     // If this is a fresh new component that hasn't been rendered yet, we
     // won't update its child set by applying minimal side-effects. Instead,
     // we will add them all to the child before it gets rendered. That means
     // we can optimize this reconciliation pass by not tracking side-effects.
+    // 如果这是一个尚未渲染的全新组件，我们将不会通过应用最小的副作用来更新其子集。
+    // 相反，我们将在渲染之前将它们全部添加到子级中。这意味着我们可以通过不跟踪副作用来优化此协调过程。
     workInProgress.child = mountChildFibers(
       workInProgress,
       null,
@@ -344,12 +354,18 @@ export function reconcileChildren(
       renderLanes,
     );
   } else {
+    // update的逻辑，
     // If the current child is the same as the work in progress, it means that
     // we haven't yet started any work on these children. Therefore, we use
     // the clone algorithm to create a copy of all the current children.
+    // 如果当前child和workInProgress的child是一样的，那么意味着我们还没有开始对这些child进行任何工作。
+    // 因此，我们使用克隆算法来创建所有当前child的副本。
+
 
     // If we had any progressed work already, that is invalid at this point so
     // let's throw it out.
+    // 如果我们已经有任何进展的工作，那么在这一点上是无效的，所以让我们把它扔掉。
+    // 重置workInProgress的child
     workInProgress.child = reconcileChildFibers(
       workInProgress,
       current.child,
@@ -3931,6 +3947,13 @@ function attemptEarlyBailoutIfNoScheduledUpdate(
   return bailoutOnAlreadyFinishedWork(current, workInProgress, renderLanes);
 }
 
+/**
+ * 创建子fiberNode并与workInProgress关联
+ * @param {*} current
+ * @param {*} workInProgress
+ * @param {*} renderLanes
+ * @returns
+ */
 function beginWork(
   current: Fiber | null,
   workInProgress: Fiber,
@@ -3955,9 +3978,12 @@ function beginWork(
   }
 
   if (current !== null) {
+    // current不为空时是update，需要对比新旧fiberNode
     const oldProps = current.memoizedProps;
     const newProps = workInProgress.pendingProps;
 
+    // 主要对比current和workInProgress的props和context是否有变化
+    // 判断是否影响foberNode.child，如果不影响就复用对应的current fiberNode
     if (
       oldProps !== newProps ||
       hasLegacyContextChanged() ||
@@ -3966,10 +3992,13 @@ function beginWork(
     ) {
       // If props or context changed, mark the fiber as having performed work.
       // This may be unset if the props are determined to be equal later (memo).
+      // 如果props或上下文发生变化，将fiber标记为需要执行工作。
+      // 如果稍后确定props相等（memo），则可能会取消设置。
       didReceiveUpdate = true;
     } else {
       // Neither props nor legacy context changes. Check if there's a pending
       // update or context change.
+      // props和legacy context都没有变化，检查是否有挂起的更新或context变化
       const hasScheduledUpdateOrContext = checkScheduledUpdateOrContext(
         current,
         renderLanes,
@@ -3978,9 +4007,11 @@ function beginWork(
         !hasScheduledUpdateOrContext &&
         // If this is the second pass of an error or suspense boundary, there
         // may not be work scheduled on `current`, so we check for this flag.
+        // 如果这是错误或suspense边界的第二次传递，则可能没有在`current`上安排工作，因此我们检查此标志。
         (workInProgress.flags & DidCapture) === NoFlags
       ) {
         // No pending updates or context. Bail out now.
+        // 没有挂起的更新或context，现在退出
         didReceiveUpdate = false;
         return attemptEarlyBailoutIfNoScheduledUpdate(
           current,
@@ -3991,16 +4022,20 @@ function beginWork(
       if ((current.flags & ForceUpdateForLegacySuspense) !== NoFlags) {
         // This is a special case that only exists for legacy mode.
         // See https://github.com/facebook/react/pull/19216.
+        // 这是仅适用于传统模式的特殊情况。
         didReceiveUpdate = true;
       } else {
         // An update was scheduled on this fiber, but there are no new props
         // nor legacy context. Set this to false. If an update queue or context
         // consumer produces a changed value, it will set this to true. Otherwise,
         // the component will assume the children have not changed and bail out.
+        // 在此fiber上安排了更新，但没有新的props或legacy context。将其设置为false。
+        // 如果更新队列或context消费者生成更改的值，它将将其设置为true。否则，组件将假定子项未更改并退出。
         didReceiveUpdate = false;
       }
     }
   } else {
+    // 走到这里说明是mount
     didReceiveUpdate = false;
 
     if (getIsHydrating() && isForkedChild(workInProgress)) {
@@ -4013,6 +4048,9 @@ function beginWork(
       //
       // We only use this for id generation during hydration, which is why the
       // logic is located in this special branch.
+      // 检查此子项是否属于其父项中的多个子项列表。
+      // 在真正的多线程实现中，我们将在并行线程上渲染子项。这将表示此子树的新渲染线程的开始。
+      // 我们仅在hydration期间使用此功能进行id生成，这就是为什么逻辑位于此特殊分支中。
       const slotIndex = workInProgress.index;
       const numberOfForks = getForksAtLevel(workInProgress);
       pushTreeId(workInProgress, numberOfForks, slotIndex);
@@ -4024,8 +4062,16 @@ function beginWork(
   // the update queue. However, there's an exception: SimpleMemoComponent
   // sometimes bails out later in the begin phase. This indicates that we should
   // move this assignment out of the common path and into each branch.
+  // 进入begin阶段之前，清除挂起的更新优先级。
+  // TODO: 这假设我们将评估组件并处理更新队列。但是，有一个例外：SimpleMemoComponent
+  // 有时稍后在begin阶段退出。这表明我们应该将此赋值移出常规路径并移入每个分支。
   workInProgress.lanes = NoLanes;
 
+  /**
+   * 这段代码是React内部处理不同类型工作单元的关键部分，它决定了如何更新或挂载各种类型的React元素。
+   * 如果常见类型如FunctionComponent、ClassComponent、HostComponent没有命中优化策略
+   * 最终会进入{@link reconcileChildren}方法，递归处理子节点。
+   */
   switch (workInProgress.tag) {
     case IndeterminateComponent: {
       return mountIndeterminateComponent(

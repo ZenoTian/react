@@ -866,8 +866,10 @@ export function isUnsafeClassRenderPhaseUpdate(fiber: Fiber): boolean {
   return (executionContext & RenderContext) !== NoContext;
 }
 
-// This is the entry point for every concurrent task, i.e. anything that
-// goes through Scheduler.
+// This is the entry point for every concurrent task, i.e. anything that goes through Scheduler.
+/**
+ * @description 用于执行并发任务。每个任务都会经过调度器
+ */
 export function performConcurrentWorkOnRoot(
   root: FiberRoot,
   didTimeout: boolean,
@@ -1342,8 +1344,10 @@ function markRootSuspended(
   _markRootSuspended(root, suspendedLanes, spawnedLane);
 }
 
-// This is the entry point for synchronous tasks that don't go
-// through Scheduler
+// This is the entry point for synchronous tasks that don't go through Scheduler
+/**
+ * @description 同步任务的入口，不通过调度器。
+ */
 export function performSyncWorkOnRoot(root: FiberRoot, lanes: Lanes): null {
   if ((executionContext & (RenderContext | CommitContext)) !== NoContext) {
     throw new Error('Should not already be working.');
@@ -2076,9 +2080,11 @@ function renderRootSync(root: FiberRoot, lanes: Lanes) {
 }
 
 // The work loop is an extremely hot path. Tell Closure not to inline it.
+// 工作循环是经常调用的
 /** @noinline */
 function workLoopSync() {
   // Perform work without checking if we need to yield between fiber.
+  // 执行时不需要检查在fiber任务间需要yield让步
   while (workInProgress !== null) {
     performUnitOfWork(workInProgress);
   }
@@ -2289,6 +2295,8 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
         // This is not just an optimization: in a unit test environment, we
         // can't trust the result of `shouldYield`, because the host I/O is
         // likely mocked.
+        // `act`特殊案例：如果我们在`act`范围内，请不要咨询`shouldYield`。始终继续工作，直到渲染完成。
+        // 这不仅仅是一种优化：在单元测试环境中，我们不能信任`shouldYield`的结果，因为主机I/O可能被模拟。
         workLoopSync();
       } else {
         workLoopConcurrent();
@@ -2335,19 +2343,33 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
   }
 }
 
+// noinlne标识是为了告知Closure(打包？)不要内联此函数
 /** @noinline */
 function workLoopConcurrent() {
   // Perform work until Scheduler asks us to yield
+  // workInProgressb代表当前正在进行的工作单元
+  // 有活可干的时候就判断是否要让出控制权
   while (workInProgress !== null && !shouldYield()) {
     // $FlowFixMe[incompatible-call] found when upgrading Flow
     performUnitOfWork(workInProgress);
   }
 }
 
+/**
+ * @description 创建下一个fiberNode（）
+ * @step1 初始化工作单元
+ * @step2 开始工作
+ * @step3 完成工作单元
+ */
 function performUnitOfWork(unitOfWork: Fiber): void {
-  // The current, flushed, state of this fiber is the alternate. Ideally
-  // nothing should rely on this, but relying on it here means that we don't
-  // need an additional field on the work in progress.
+  // The current, flushed, state of this fiber is the alternate.
+  // Ideally nothing should rely on this,
+  // but relying on it here means that we don't need an additional field on the work in progress.
+  /**
+   * 此fiber的当前刷新状态为备用状态。
+   * 理想情况下，任何东西都不应该依赖于此，
+   * 但在此依赖于它意味着我们不需要在正在进行的工作中添加额外的字段。
+   */
   const current = unitOfWork.alternate;
   setCurrentDebugFiberInDEV(unitOfWork);
 
@@ -2357,15 +2379,25 @@ function performUnitOfWork(unitOfWork: Fiber): void {
     next = beginWork(current, unitOfWork, entangledRenderLanes);
     stopProfilerTimerIfRunningAndRecordDelta(unitOfWork, true);
   } else {
+    // 开始干活
+    // 从HostRootFiber通过深度优先递归，为每个fiberNode执行beginwork
+    // beginWork会根据传入的fiberNode创建下一级的fiberNode
+    // 子fiberNode通过 fiberNode.return = parentFiber（wip）方式连接
+    // 如果子有兄弟，则只有头部和的finberNode会有parentFiber（wip）连接
+    // 兄弟节点之间通过 0fiber.sibling = 1fiber的方式连接
+    // 执行到叶子节点之后就会返回null
     next = beginWork(current, unitOfWork, entangledRenderLanes);
   }
 
   resetCurrentDebugFiberInDEV();
+  // 记录当前props
   unitOfWork.memoizedProps = unitOfWork.pendingProps;
   if (next === null) {
     // If this doesn't spawn new work, complete the current work.
+    // next为null，说明没有新的任务，完成当前任务
     completeUnitOfWork(unitOfWork);
   } else {
+    // 把下一个任务赋值给workInProgress
     workInProgress = next;
   }
 

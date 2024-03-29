@@ -13,16 +13,21 @@ export type Flags = number;
 
 // Don't change these values. They're used by React Dev Tools.
 export const NoFlags = /*                      */ 0b0000000000000000000000000000;
+// PerformedWork 表示fiber已经完成了工作，可以提交到DOM中
 export const PerformedWork = /*                */ 0b0000000000000000000000000001;
+// 标记Placement，表示fiber需要插入到DOM中
 export const Placement = /*                    */ 0b0000000000000000000000000010;
+// DidCapture 表示fiber捕获了错误
 export const DidCapture = /*                   */ 0b0000000000000000000010000000;
+// Hydrating 表示fiber正在被hydrate
 export const Hydrating = /*                    */ 0b0000000000000001000000000000;
 
 // You can change the rest (and add more).
 export const Update = /*                       */ 0b0000000000000000000000000100;
 /* Skipped value:                                 0b0000000000000000000000001000; */
-
+// ChildDeletion 表示fiber的子节点被删除
 export const ChildDeletion = /*                */ 0b0000000000000000000000010000;
+// ContentReset 表示fiber的内容被重置
 export const ContentReset = /*                 */ 0b0000000000000000000000100000;
 export const Callback = /*                     */ 0b0000000000000000000001000000;
 /* Used by DidCapture:                            0b0000000000000000000010000000; */

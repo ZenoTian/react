@@ -401,6 +401,12 @@ type ChildReconciler = (
 // to be able to optimize each path individually by branching early. This needs
 // a compiler or we can do it manually. Helpers that don't need this branching
 // live outside of this function.
+// 这个包装函数存在是因为我希望在每个路径中克隆代码，以便能够通过提前分支来单独优化每个路径。
+// 这需要一个编译器，或者我们可以手动完成。不需要这种分支的帮助程序位于此函数之外。
+/**
+ *
+ * @param {*} shouldTrackSideEffects 是否跟踪副作用，关联到内部函数是否标记flags
+ */
 function createChildReconciler(
   shouldTrackSideEffects: boolean,
 ): ChildReconciler {
@@ -466,6 +472,10 @@ function createChildReconciler(
     return clone;
   }
 
+  /**
+   * @description 用于处理新的子节点
+   *
+   */
   function placeChild(
     newFiber: Fiber,
     lastPlacedIndex: number,
@@ -475,6 +485,7 @@ function createChildReconciler(
     if (!shouldTrackSideEffects) {
       // During hydration, the useId algorithm needs to know which fibers are
       // part of a list of children (arrays, iterators).
+      // 在hydration期间，useId算法需要知道哪些fiber是子列表的一部分（数组，迭代器）。
       newFiber.flags |= Forked;
       return lastPlacedIndex;
     }
